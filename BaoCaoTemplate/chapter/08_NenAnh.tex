@@ -35,11 +35,11 @@ Chọn khối số 0 ở góc trên bên trái làm khối mẫu. Ma trận đi�
      163      163      152      144      151      145      151      141
      158      157      157      150      145      156      151      139
 \end{Verbatim}
-\clearpage
 \section{Câu 2 – Biến đổi DCT}
 \subsection{Cách thực hiện}
 Hàm dct\_blocks(blocks) chuyển từng khối sang float32, trừ 128 rồi gọi cv2.dct. Cần đổi kiểu dữ liệu trước khi trừ để các giá trị âm được tính đúng. Kết quả là mảng hệ số DCT có cùng kích thước (N, 8, 8), kiểu float32.
 
+\clearpage
 \subsection{Kết quả của khối mẫu}
 Dùng lại khối số 0 ở Câu 1. Ma trận DCT nhận được là:
 
@@ -65,7 +65,6 @@ Hệ số DC ở vị trí (0, 0) bằng 201,375. Hệ số này thể hiện đ
 \FloatBarrier
 Trong khối mẫu, DC có độ lớn lớn nhất. Một số AC gần góc trên bên trái cũng khá lớn, như F[1,1] ≈ −22,75 và F[3,0] ≈ −22,10. Nhiều hệ số ở góc dưới bên phải nhỏ hơn, như F[6,6] ≈ 0,14 và F[7,7] ≈ −0,88. Như vậy, các hệ số lớn chủ yếu nằm ở vùng tần số thấp. Cách vẽ log giúp nhìn rõ cả những hệ số nhỏ.
 
-\clearpage
 \section{Câu 3 – Lượng tử hóa và dựng lại ảnh}
 \subsection{Cách lượng tử hóa}
 Hàm quantize(coefficients, quant\_scale) nhận các hệ số DCT và mức lượng tử quant\_scale > 0. Bảng Q được tính theo từng phần tử như sau:
@@ -77,6 +76,7 @@ quantized = round(coefficients / Q)
 \end{Verbatim}
 Hàm trả về quantized là mảng số nguyên int32 kích thước (N, 8, 8), và Q là bảng float32 kích thước 8×8. Có thể hiểu lượng tử hóa là chia mỗi hệ số DCT cho giá trị tương ứng trong Q rồi làm tròn. Q càng lớn thì các hệ số nhỏ càng dễ trở thành 0.
 
+\clearpage
 \subsection{Kết quả tại quant\_scale = 1,0}
 Bảng Q tại mức 1,0:
 
@@ -111,7 +111,6 @@ MSE là trung bình bình phương chênh lệch giữa điểm ảnh gốc và 
 
 Số bit dữ liệu là độ dài chuỗi Huffman, chưa gồm bảng mã, Q và thông tin đi kèm. Đây không phải dung lượng file JPEG chuẩn. Các ảnh PNG chỉ dùng để quan sát kết quả.
 
-\clearpage
 \subsection{Kết quả ảnh đầy đủ 240 × 416}
 \begin{center}
 \small\renewcommand{\arraystretch}{1.3}
@@ -132,7 +131,6 @@ Số bit dữ liệu là độ dài chuỗi Huffman, chưa gồm bảng mã, Q v
 
 Khi tăng mức lượng tử, số hệ số bằng 0 tăng từ khoảng 70,8\% lên 91,9\%. Nhiều số 0 giúp bước mã hóa cần ít bit hơn. Kết quả cho thấy phải đánh đổi giữa chất lượng ảnh và số bit dữ liệu.
 
-\clearpage
 \subsection{Kết quả ảnh cắt 13 × 19}
 \begin{center}
 \small\renewcommand{\arraystretch}{1.3}
@@ -153,7 +151,6 @@ Khi tăng mức lượng tử, số hệ số bằng 0 tăng từ khoảng 70,8\
 
 Ảnh cắt được đệm thành 16×24 để xử lí. Khi dựng lại, chương trình bỏ phần đệm để trả về đúng 13×19. MSE được tính trên 247 điểm ảnh ban đầu; số bit và tỉ lệ hệ số bằng 0 tính trên toàn bộ 6 khối sau đệm.
 
-\clearpage
 \subsection{Bước làm mất thông tin}
 Lượng tử hóa là bước chính làm mất thông tin. Khi chia rồi làm tròn, nhiều giá trị khác nhau trở thành cùng một số nguyên. Vì vậy, nhân lại với Q không lấy lại được chính xác giá trị ban đầu. Ví dụ, DC của khối mẫu là 201,375; sau lượng tử hóa được 25, nhân lại Q chỉ được 200.
 

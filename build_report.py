@@ -21,15 +21,17 @@ NAME = '23020761_NguyenVanQuan'
 doc = Document()
 section = doc.sections[0]
 section.page_height, section.page_width = Cm(29.7), Cm(21)
-section.top_margin, section.bottom_margin = Cm(2.5), Cm(3)
+section.top_margin = section.bottom_margin = Cm(2)
 section.left_margin, section.right_margin = Cm(3), Cm(2)
 normal = doc.styles['Normal']
 normal.font.name, normal.font.size = 'Times New Roman', Pt(12)
-normal.paragraph_format.space_after = Pt(6)
+normal.paragraph_format.space_after = Pt(4)
+normal.paragraph_format.line_spacing = 1.2
 parts = []
 tex_parts = []
 body_mode = False
 main_headings = []
+heading_group = False
 REPO = 'https://github.com/quansystems/compress_image'
 
 def tex(s):
@@ -39,16 +41,27 @@ def tex(s):
 def para(s):
     parts.append('<p>' + html.escape(s) + '</p>')
     doc.add_paragraph(s)
+    close_heading_group()
     if body_mode:
         tex_parts.append(tex(s) + '\n\n')
 
 def heading(s, level=1):
+    global heading_group
+    if not heading_group:
+        parts.append('<div class="keep">')
+        heading_group = True
     parts.append(f'<h{level}>{html.escape(s)}</h{level}>')
     doc.add_heading(s, level=level)
     if body_mode:
         tex_parts.append('\\' + ('section' if level == 1 else 'subsection') + '{' + tex(re.sub(r'^\d+(?:\.\d+)*\.? ', '', s)) + '}\n')
         if level == 1:
             main_headings.append(s)
+
+def close_heading_group():
+    global heading_group
+    if heading_group:
+        parts.append('</div>')
+        heading_group = False
 
 def page():
     parts.append('<div style="page-break-before:always"></div>')
@@ -60,12 +73,14 @@ def image(path, caption, width=17):
     parts.append(f'<div class="figure"><img src="{path}" width="450"><p class="caption">{html.escape(caption)}</p></div>')
     doc.add_picture(str(ROOT / path), width=Cm(min(width, 16)))
     doc.add_paragraph(caption, style='Caption')
+    close_heading_group()
     if body_mode:
         tex_parts.append('\\begin{figure}[!htbp]\n\\centering\n\\includegraphics[width=\\linewidth]{../' + path + '}\n\\caption{' + tex(re.sub(r'^Hình \d+\. ', '', caption)) + '}\n\\end{figure}\n\\FloatBarrier\n')
 
 def code(s):
     wrapped = '\n'.join('\n'.join(textwrap.wrap(line, 94, subsequent_indent='    ', replace_whitespace=False, drop_whitespace=False)) if len(line)>94 else line for line in s.splitlines())
-    parts.append('<pre>' + html.escape(wrapped) + '</pre>')
+    parts.append('<pre style="page-break-inside:avoid">' + html.escape(wrapped) + '</pre>')
+    close_heading_group()
     p = doc.add_paragraph()
     run = p.add_run(wrapped)
     run.font.name, run.font.size = 'Consolas', Pt(8)
@@ -74,7 +89,8 @@ def code(s):
         tex_parts.append('\\begin{Verbatim}[fontsize=\\scriptsize]\n' + wrapped + '\n\\end{Verbatim}\n')
 
 def table(headers, rows):
-    parts.append('<table><tr>' + ''.join('<th>'+html.escape(str(x))+'</th>' for x in headers) + '</tr>' + ''.join('<tr>'+''.join('<td>'+html.escape(str(x))+'</td>' for x in row)+'</tr>' for row in rows)+'</table>')
+    parts.append('<div class="keep"><table><tr>' + ''.join('<th>'+html.escape(str(x))+'</th>' for x in headers) + '</tr>' + ''.join('<tr>'+''.join('<td>'+html.escape(str(x))+'</td>' for x in row)+'</tr>' for row in rows)+'</table></div>')
+    close_heading_group()
     t = doc.add_table(rows=1, cols=len(headers))
     t.style = 'Table Grid'
     for c, value in zip(t.rows[0].cells, headers):
@@ -82,12 +98,15 @@ def table(headers, rows):
     for row in rows:
         for c, value in zip(t.add_row().cells, row):
             c.text = str(value)
+    for row in t.rows:
+        row._tr.get_or_add_trPr().append(OxmlElement('w:cantSplit'))
     if body_mode:
         spec = '|'+ '|'.join(f'p{{{(15.2-0.5*len(headers))/len(headers):.2f}cm}}' for _ in headers)+'|'
         tex_parts.append('\\begin{center}\n\\small\\renewcommand{\\arraystretch}{1.3}\n\\begin{tabular}{' + spec + '}\\hline\n' + ' & '.join('\\textbf{'+tex(str(x))+'}' for x in headers) + r' \\ \hline' + '\n' + '\n'.join(' & '.join(tex(str(x)) for x in row)+r' \\ \hline' for row in rows) + '\n\\end{tabular}\n\\end{center}\n')
 
 def link(label, url):
     parts.append(f'<p class="repo"><a href="{html.escape(url)}">{html.escape(label)}</a></p>')
+    close_heading_group()
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.space_before = Pt(12)
@@ -131,6 +150,7 @@ para('HÀ NỘI - 2026')
 parts.append('</div>')
 page()
 parts.clear()
+heading_group = False
 toc_title = doc.add_heading('MỤC LỤC', level=1)
 toc_paragraph = doc.add_paragraph()
 toc_field = OxmlElement('w:fldSimple')
@@ -152,10 +172,10 @@ para('Ảnh đầy đủ không cần đệm vì cả hai chiều đều chia h�
 image('code/ket_qua/cau1/chia_khoi.png', 'Hình 1. Ảnh gốc, lưới khối 8×8 và ảnh cắt sau đệm.')
 para('Chọn khối số 0 ở góc trên bên trái làm khối mẫu. Ma trận điểm ảnh của khối này là:')
 matrix('code/ket_qua/cau1/khoi_mau.txt')
-page()
 heading('2. Câu 2 – Biến đổi DCT')
 heading('2.1. Cách thực hiện', 2)
 para('Hàm dct_blocks(blocks) chuyển từng khối sang float32, trừ 128 rồi gọi cv2.dct. Cần đổi kiểu dữ liệu trước khi trừ để các giá trị âm được tính đúng. Kết quả là mảng hệ số DCT có cùng kích thước (N, 8, 8), kiểu float32.')
+page()
 heading('2.2. Kết quả của khối mẫu', 2)
 para('Dùng lại khối số 0 ở Câu 1. Ma trận DCT nhận được là:')
 matrix('code/ket_qua/cau2/dct_khoi_mau.txt', 2)
@@ -163,12 +183,12 @@ para('Hệ số DC ở vị trí (0, 0) bằng 201,375. Hệ số này thể hi�
 para('63 hệ số còn lại là AC, thể hiện sự thay đổi độ sáng trong khối theo chiều ngang và chiều dọc. Các vị trí gần góc trên bên trái là tần số thấp, thường mô tả vùng sáng thay đổi chậm. Các vị trí xa góc này là tần số cao, thường mô tả chi tiết nhỏ và đường biên.')
 image('code/ket_qua/cau2/dct.png', 'Hình 2. Khối mẫu và ảnh màu log(1 + |DCT|), kèm thang màu.')
 para('Trong khối mẫu, DC có độ lớn lớn nhất. Một số AC gần góc trên bên trái cũng khá lớn, như F[1,1] ≈ −22,75 và F[3,0] ≈ −22,10. Nhiều hệ số ở góc dưới bên phải nhỏ hơn, như F[6,6] ≈ 0,14 và F[7,7] ≈ −0,88. Như vậy, các hệ số lớn chủ yếu nằm ở vùng tần số thấp. Cách vẽ log giúp nhìn rõ cả những hệ số nhỏ.')
-page()
 heading('3. Câu 3 – Lượng tử hóa và dựng lại ảnh')
 heading('3.1. Cách lượng tử hóa', 2)
 para('Hàm quantize(coefficients, quant_scale) nhận các hệ số DCT và mức lượng tử quant_scale > 0. Bảng Q được tính theo từng phần tử như sau:')
 code('Q0[u, v] = 8 + 4 × (u + v), với u, v từ 0 đến 7\nQ = max(1, round(Q0 × quant_scale))\nquantized = round(coefficients / Q)')
 para('Hàm trả về quantized là mảng số nguyên int32 kích thước (N, 8, 8), và Q là bảng float32 kích thước 8×8. Có thể hiểu lượng tử hóa là chia mỗi hệ số DCT cho giá trị tương ứng trong Q rồi làm tròn. Q càng lớn thì các hệ số nhỏ càng dễ trở thành 0.')
+page()
 heading('3.2. Kết quả tại quant_scale = 1,0', 2)
 para('Bảng Q tại mức 1,0:')
 matrix('code/ket_qua/cau3/anh_day_du_Q.txt')
@@ -180,7 +200,6 @@ para('Dùng nguyên mã hỗ trợ trong jpeg_support.py của đề bài để 
 para('MSE là trung bình bình phương chênh lệch giữa điểm ảnh gốc và điểm ảnh dựng lại. MSE càng nhỏ thì ảnh dựng lại càng gần ảnh gốc. MSE chỉ được tính trên vùng ảnh ban đầu, sau khi bỏ phần đệm.')
 para('Số bit dữ liệu là độ dài chuỗi Huffman, chưa gồm bảng mã, Q và thông tin đi kèm. Đây không phải dung lượng file JPEG chuẩn. Các ảnh PNG chỉ dùng để quan sát kết quả.')
 for prefix, title in [('anh_day_du', '3.4. Kết quả ảnh đầy đủ 240 × 416'), ('anh_cat_13x19', '3.5. Kết quả ảnh cắt 13 × 19')]:
-    page()
     heading(title, 2)
     with (ROOT / f'code/ket_qua/cau3/{prefix}_ket_qua.csv').open(encoding='utf-8-sig') as stream:
         rows = list(csv.DictReader(stream))
@@ -193,7 +212,6 @@ for prefix, title in [('anh_day_du', '3.4. Kết quả ảnh đầy đủ 240 ×
     else:
         para('Ảnh cắt cũng cho kết quả tương tự: khi tăng mức lượng tử từ 0,5 lên 3,0, MSE tăng từ 16,04 lên 77,62, còn số bit giảm từ 480 xuống 63. Tỉ lệ hệ số bằng 0 tăng từ khoảng 74,0% lên 96,4%.')
         para('Ảnh cắt được đệm thành 16×24 để xử lí. Khi dựng lại, chương trình bỏ phần đệm để trả về đúng 13×19. MSE được tính trên 247 điểm ảnh ban đầu; số bit và tỉ lệ hệ số bằng 0 tính trên toàn bộ 6 khối sau đệm.')
-page()
 heading('3.6. Bước làm mất thông tin', 2)
 para('Lượng tử hóa là bước chính làm mất thông tin. Khi chia rồi làm tròn, nhiều giá trị khác nhau trở thành cùng một số nguyên. Vì vậy, nhân lại với Q không lấy lại được chính xác giá trị ban đầu. Ví dụ, DC của khối mẫu là 201,375; sau lượng tử hóa được 25, nhân lại Q chỉ được 200.')
 para('Zigzag, RLE và Huffman không làm mất các hệ số nguyên đã lượng tử hóa. DCT và IDCT có sai số tính toán nhỏ. Việc làm tròn và giới hạn điểm ảnh về 0–255 khi xuất ảnh cũng có thể tạo thêm sai số.')
@@ -210,17 +228,18 @@ css = '''
 @font-face {font-family: Times; src: url(times.ttf);}
 @font-face {font-family: Times; src: url(timesbd.ttf); font-weight: bold;}
 @font-face {font-family: Mono; src: url(consola.ttf);}
-body {font-family: Times; font-size: 12pt; line-height: 1.3; color: black;}
-h1 {font-size:16pt; margin-top:16pt; margin-bottom:9pt; page-break-after:avoid;}
-h2 {font-size:13pt; margin-top:12pt; margin-bottom:7pt; page-break-after:avoid;}
-p {margin-top:5pt; margin-bottom:8pt; text-align:justify;}
-table {border-collapse:collapse; width:100%; margin-top:8pt; margin-bottom:12pt; font-size:10pt;}
-td,th {border:0.5pt solid #a4b5c5; padding:5pt;}
+body {font-family: Times; font-size: 12pt; line-height: 1.2; color: black;}
+h1 {font-size:16pt; margin-top:10pt; margin-bottom:6pt; page-break-after:avoid;}
+h2 {font-size:13pt; margin-top:7pt; margin-bottom:4pt; page-break-after:avoid;}
+p {margin-top:2pt; margin-bottom:4pt; text-align:justify;}
+table {border-collapse:collapse; width:100%; margin-top:5pt; margin-bottom:6pt; font-size:10pt;}
+td,th {border:0.5pt solid #a4b5c5; padding:4pt;}
 th {font-weight:bold;}
-pre {font-family:Mono; font-size:7.5pt; line-height:1.25; margin:8pt 0;}
+pre {font-family:Mono; font-size:7.5pt; line-height:1.25; margin:6pt 0;}
 .caption {font-size:10pt; text-align:center;}
 .figure {page-break-inside:avoid;}
-.repo {font-size:11pt; text-align:center; padding:12pt; border:0.5pt solid #a4b5c5; background-color:#f5f7fa;}
+.keep {page-break-inside:avoid;}
+.repo {font-size:11pt; text-align:center; padding:8pt; border:0.5pt solid #a4b5c5; background-color:#f5f7fa;}
 .cover {text-align:center; padding-top:45pt;}
 .cover p {text-align:center; margin-bottom:22pt;}
 .cover h1 {font-size:22pt; margin-top:32pt;}
@@ -229,7 +248,7 @@ pre {font-family:Mono; font-size:7.5pt; line-height:1.25; margin:8pt 0;}
 archive = fitz.Archive(str(ROOT))
 archive.add('C:/Windows/Fonts')
 rect = fitz.Rect(0, 0, 595.276, 841.89)
-content = fitz.Rect(85.04, 70.87, 538.58, 756.85)
+content = fitz.Rect(85.04, 56.69, 538.58, 785.20)
 story = fitz.Story(html=''.join(parts), user_css=css, archive=archive)
 body_pdf = story.write_with_links(lambda *_: (rect, content, None))
 pdf = fitz.open()
@@ -278,7 +297,7 @@ pdf.set_toc([[1, title, i+1] for title, i in entries])
 pdf.set_metadata({'title': 'Báo cáo thực hành số 8 – Mô phỏng nén ảnh xám', 'author': 'Nguyễn Văn Quân – 23020761'})
 for index, p in enumerate(pdf):
     if index:
-        p.insert_text((305, 795), 'i' if index == 1 else str(index-1), fontsize=10)
+        p.insert_text((305, 810), 'i' if index == 1 else str(index-1), fontsize=10)
 pdf.save(OUT / f'{NAME}.pdf', deflate=True)
 for style in ['Title', 'Heading 1', 'Heading 2']:
     doc.styles[style].font.name = 'Times New Roman'
