@@ -10,4 +10,7 @@ venv/
 .env
 .env.*
 *.token
-bao_cao/_report_body.pdf
+/bao_cao/
+/BaoCaoTemplate/
+/build_report.py
+/requirements-report.txt

@@ -4,11 +4,8 @@
 
 Chia ảnh thành khối 8×8, biến đổi DCT và lượng tử hóa; ghép với mã hỗ trợ Zigzag/RLE/Huffman trong đề bài để dựng lại ảnh.
 
-- [Báo cáo PDF](bao_cao/23020761_NguyenVanQuan.pdf)
-- [Báo cáo Word có thể chỉnh sửa](bao_cao/23020761_NguyenVanQuan.docx)
 - [Đề bài](code/Đề%20bài.pdf)
 - [Hướng dẫn mã nguồn](code/README.md)
-- [Kết quả kiểm tra](bao_cao/kiem_tra.json)
 
 ## Chạy thực nghiệm
 
@@ -24,26 +21,7 @@ python verify_results.py
 
 Ảnh RaceHorses đã có trong `code/`. Kết quả hình, ma trận và bảng CSV nằm trong `code/ket_qua/`.
 
-## Tạo lại báo cáo
-
-```powershell
-python -m pip install -r requirements-report.txt
-python build_report.py
-```
-
-Script tạo cả PDF và DOCX từ mã nguồn và kết quả thực nghiệm hiện có. Script sử dụng phông Times New Roman/Consolas trong `C:/Windows/Fonts`; nếu chạy trên hệ điều hành khác, cần sửa đường dẫn và tên phông tương ứng. Logo và thông tin bìa lấy từ mẫu báo cáo có sẵn trong `BaoCaoTemplate/`.
-
-Báo cáo dùng bố cục mẫu: bìa đóng khung UET, thông tin sinh viên/người hướng dẫn, mục lục, lề trái 3 cm và lề phải 2 cm. Mã Python được dẫn qua liên kết GitHub trong báo cáo. Toàn bộ mã thực thi nằm trong [`code/`](code/), kèm ảnh đầu vào và `requirements.txt`.
-
-Nguồn LaTeX dùng trực tiếp bìa mẫu ở [`BaoCaoTemplate/main.tex`](BaoCaoTemplate/main.tex), thông tin bìa trong `cover/thongtin.tex` và nội dung bài số 8 trong `chapter/08_NenAnh.tex` (được cập nhật khi chạy `build_report.py`). Có thể biên dịch riêng bằng XeLaTeX:
-
-```powershell
-cd BaoCaoTemplate
-xelatex main.tex
-xelatex main.tex
-```
-
-PDF/DOCX do script Python tạo theo cùng bố cục; việc tạo hai tệp này không cần cài XeLaTeX.
+`verify_results.py` kiểm tra thứ tự khối, đệm biên, DCT/IDCT, mã hóa/giải mã và ảnh kết quả. Nhật ký được tạo tại `bao_cao/kiem_tra.json` trên máy khi chạy, không được đưa lên GitHub.
 
 ## Kết quả ảnh đầy đủ (240 × 416)
 

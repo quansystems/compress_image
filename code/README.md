@@ -32,5 +32,3 @@ python cau3_luong_tu_hoa.py "C:\duong_dan\anh.png" --no-show
 Các câu 1 và 3 cần ảnh ít nhất 13×19 để thực hiện phép cắt theo đề. Mặc định kết quả được lưu ở `code/ket_qua/cau1`, `cau2`, `cau3`. Dùng `--output "thu_muc"` để đổi nơi lưu; dùng `--no-show` để chỉ lưu hình mà không mở cửa sổ. Khối mẫu của cả ba câu là khối số 0 ở góc trên trái.
 
 Trong CSV, `ti_le_he_so_0` là số trong [0, 1]; nhân 100 để lấy phần trăm. Số bit chỉ là độ dài chuỗi Huffman, không phải dung lượng file JPEG. Các PNG dựng lại được lưu để quan sát, không phải file JPEG của bộ mô phỏng.
-
-Báo cáo PDF và Word nằm trong thư mục `bao_cao/` ở thư mục gốc, trình bày theo mẫu báo cáo UET, gồm hình, bảng và nhận xét dựa trên ảnh RaceHorses thực tế. Báo cáo dẫn liên kết tới [toàn bộ mã nguồn trên GitHub](https://github.com/quansystems/compress_image/tree/main/code). Dùng `python build_report.py` tại thư mục gốc để tạo lại báo cáo và nội dung LaTeX.
