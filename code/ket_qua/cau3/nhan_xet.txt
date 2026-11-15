@@ -1,0 +1,7 @@
+Khi tăng quant_scale, bước lượng tử lớn hơn, các hệ số AC nhỏ thường trở thành 0.
+Ảnh dựng lại thường mất chi tiết hơn, MSE tăng và số bit dữ liệu giảm; hãy đối chiếu xu hướng với bảng kết quả thực tế, không coi là quy luật tuyệt đối.
+Lượng tử hóa là bước chủ yếu làm mất thông tin: phép làm tròn hệ số/Q không đảo ngược được.
+DCT/IDCT có sai số số học; làm tròn và giới hạn điểm ảnh khi xuất ảnh cũng có thể thêm sai số.
+Zigzag, RLE và Huffman bảo toàn các hệ số nguyên đã lượng tử hóa.
+Số bit chỉ tính chuỗi Huffman, chưa gồm bảng mã, Q và metadata; không phải dung lượng JPEG chuẩn.
+Ảnh giải mã được cắt bỏ phần đệm và kiểm tra có cùng kích thước, kiểu uint8 như ảnh đầu vào.

@@ -1,0 +1,122 @@
+[
+  {
+    "image": "anh_day_du",
+    "scale": 0.5,
+    "original_shape": [
+      240,
+      416
+    ],
+    "padded_shape": [
+      240,
+      416
+    ],
+    "block_order_and_padding": true,
+    "lossless_quantized_roundtrip": true,
+    "output_shape_and_dtype": true,
+    "saved_image_matches": true,
+    "dct_idct_max_abs_error": 4.57763671875e-05,
+    "MSE": 12.341145515441895,
+    "bits": 166471,
+    "zero_ratio": 0.7081129807692308
+  },
+  {
+    "image": "anh_day_du",
+    "scale": 1.0,
+    "original_shape": [
+      240,
+      416
+    ],
+    "padded_shape": [
+      240,
+      416
+    ],
+    "block_order_and_padding": true,
+    "lossless_quantized_roundtrip": true,
+    "output_shape_and_dtype": true,
+    "saved_image_matches": true,
+    "dct_idct_max_abs_error": 4.57763671875e-05,
+    "MSE": 30.474138259887695,
+    "bits": 108113,
+    "zero_ratio": 0.8114583333333333
+  },
+  {
+    "image": "anh_day_du",
+    "scale": 3.0,
+    "original_shape": [
+      240,
+      416
+    ],
+    "padded_shape": [
+      240,
+      416
+    ],
+    "block_order_and_padding": true,
+    "lossless_quantized_roundtrip": true,
+    "output_shape_and_dtype": true,
+    "saved_image_matches": true,
+    "dct_idct_max_abs_error": 4.57763671875e-05,
+    "MSE": 97.46129608154297,
+    "bits": 47347,
+    "zero_ratio": 0.918729967948718
+  },
+  {
+    "image": "anh_cat_13x19",
+    "scale": 0.5,
+    "original_shape": [
+      13,
+      19
+    ],
+    "padded_shape": [
+      16,
+      24
+    ],
+    "block_order_and_padding": true,
+    "lossless_quantized_roundtrip": true,
+    "output_shape_and_dtype": true,
+    "saved_image_matches": true,
+    "dct_idct_max_abs_error": 1.52587890625e-05,
+    "MSE": 16.04453468322754,
+    "bits": 480,
+    "zero_ratio": 0.7395833333333334
+  },
+  {
+    "image": "anh_cat_13x19",
+    "scale": 1.0,
+    "original_shape": [
+      13,
+      19
+    ],
+    "padded_shape": [
+      16,
+      24
+    ],
+    "block_order_and_padding": true,
+    "lossless_quantized_roundtrip": true,
+    "output_shape_and_dtype": true,
+    "saved_image_matches": true,
+    "dct_idct_max_abs_error": 1.52587890625e-05,
+    "MSE": 37.4412956237793,
+    "bits": 245,
+    "zero_ratio": 0.8619791666666666
+  },
+  {
+    "image": "anh_cat_13x19",
+    "scale": 3.0,
+    "original_shape": [
+      13,
+      19
+    ],
+    "padded_shape": [
+      16,
+      24
+    ],
+    "block_order_and_padding": true,
+    "lossless_quantized_roundtrip": true,
+    "output_shape_and_dtype": true,
+    "saved_image_matches": true,
+    "dct_idct_max_abs_error": 1.52587890625e-05,
+    "MSE": 77.62348175048828,
+    "bits": 63,
+    "zero_ratio": 0.9635416666666666
+  }
+]

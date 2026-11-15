@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.log
+*.aux
+*.toc
+*.out
+*.synctex.gz
+.env
+.env.*
+*.token
+bao_cao/_report_body.pdf
