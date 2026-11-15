@@ -33,4 +33,4 @@ Các câu 1 và 3 cần ảnh ít nhất 13×19 để thực hiện phép cắt 
 
 Trong CSV, `ti_le_he_so_0` là số trong [0, 1]; nhân 100 để lấy phần trăm. Số bit chỉ là độ dài chuỗi Huffman, không phải dung lượng file JPEG. Các PNG dựng lại được lưu để quan sát, không phải file JPEG của bộ mô phỏng.
 
-Báo cáo PDF và Word đã hoàn thiện nằm trong thư mục `bao_cao/` ở thư mục gốc. Báo cáo gồm mã đầy đủ ba module, hình, bảng và nhận xét dựa trên ảnh RaceHorses thực tế; dùng `python build_report.py` tại thư mục gốc để tạo lại.
+Báo cáo PDF và Word nằm trong thư mục `bao_cao/` ở thư mục gốc, trình bày theo mẫu báo cáo UET, gồm hình, bảng và nhận xét dựa trên ảnh RaceHorses thực tế. Báo cáo dẫn liên kết tới [toàn bộ mã nguồn trên GitHub](https://github.com/quansystems/compress_image/tree/main/code). Dùng `python build_report.py` tại thư mục gốc để tạo lại báo cáo và nội dung LaTeX.

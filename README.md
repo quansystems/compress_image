@@ -33,6 +33,18 @@ python build_report.py
 
 Script tạo cả PDF và DOCX từ mã nguồn và kết quả thực nghiệm hiện có. Script sử dụng phông Times New Roman/Consolas trong `C:/Windows/Fonts`; nếu chạy trên hệ điều hành khác, cần sửa đường dẫn và tên phông tương ứng. Logo và thông tin bìa lấy từ mẫu báo cáo có sẵn trong `BaoCaoTemplate/`.
 
+Báo cáo dùng bố cục mẫu: bìa đóng khung UET, thông tin sinh viên/người hướng dẫn, mục lục, lề trái 3 cm và lề phải 2 cm. Mã Python được dẫn qua liên kết GitHub trong báo cáo. Toàn bộ mã thực thi nằm trong [`code/`](code/), kèm ảnh đầu vào và `requirements.txt`.
+
+Nguồn LaTeX dùng trực tiếp bìa mẫu ở [`BaoCaoTemplate/main.tex`](BaoCaoTemplate/main.tex), thông tin bìa trong `cover/thongtin.tex` và nội dung bài số 8 trong `chapter/08_NenAnh.tex` (được cập nhật khi chạy `build_report.py`). Có thể biên dịch riêng bằng XeLaTeX:
+
+```powershell
+cd BaoCaoTemplate
+xelatex main.tex
+xelatex main.tex
+```
+
+PDF/DOCX do script Python tạo theo cùng bố cục; việc tạo hai tệp này không cần cài XeLaTeX.
+
 ## Kết quả ảnh đầy đủ (240 × 416)
 
 | Scale | MSE | Bit dữ liệu | Hệ số bằng 0 |

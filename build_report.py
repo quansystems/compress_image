@@ -2,16 +2,19 @@
 from pathlib import Path
 import csv
 import html
-import io
-import json
 import platform
+import re
 import textwrap
 
 import cv2
 import numpy as np
 import pymupdf as fitz
 from docx import Document
-from docx.shared import Cm, Pt
+from docx.shared import Cm, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / 'bao_cao'
@@ -20,29 +23,47 @@ NAME = '23020761_NguyenVanQuan'
 doc = Document()
 section = doc.sections[0]
 section.page_height, section.page_width = Cm(29.7), Cm(21)
-section.top_margin = section.bottom_margin = Cm(2)
-section.left_margin = section.right_margin = Cm(2)
+section.top_margin, section.bottom_margin = Cm(2.5), Cm(3)
+section.left_margin, section.right_margin = Cm(3), Cm(2)
 normal = doc.styles['Normal']
 normal.font.name, normal.font.size = 'Times New Roman', Pt(12)
 normal.paragraph_format.space_after = Pt(6)
 parts = []
+tex_parts = []
+body_mode = False
+main_headings = []
+REPO = 'https://github.com/quansystems/compress_image'
+
+def tex(s):
+    mapping = {'\\': r'\textbackslash{}', '&': r'\&', '%': r'\%', '$': r'\$', '#': r'\#', '_': r'\_', '{': r'\{', '}': r'\}', '~': r'\textasciitilde{}', '^': r'\textasciicircum{}'}
+    return ''.join(mapping.get(c, c) for c in s)
 
 def para(s):
     parts.append('<p>' + html.escape(s) + '</p>')
     doc.add_paragraph(s)
+    if body_mode:
+        tex_parts.append(tex(s) + '\n\n')
 
 def heading(s, level=1):
     parts.append(f'<h{level}>{html.escape(s)}</h{level}>')
     doc.add_heading(s, level=level)
+    if body_mode:
+        tex_parts.append('\\' + ('section' if level == 1 else 'subsection') + '{' + tex(re.sub(r'^\d+(?:\.\d+)*\.? ', '', s)) + '}\n')
+        if level == 1:
+            main_headings.append(s)
 
 def page():
     parts.append('<div style="page-break-before:always"></div>')
     doc.add_page_break()
+    if body_mode:
+        tex_parts.append('\\clearpage\n')
 
 def image(path, caption, width=17):
-    parts.append(f'<img src="{path}" width="480"><p class="caption">{html.escape(caption)}</p>')
-    doc.add_picture(str(ROOT / path), width=Cm(width))
+    parts.append(f'<div class="figure"><img src="{path}" width="450"><p class="caption">{html.escape(caption)}</p></div>')
+    doc.add_picture(str(ROOT / path), width=Cm(min(width, 16)))
     doc.add_paragraph(caption, style='Caption')
+    if body_mode:
+        tex_parts.append('\\begin{figure}[!htbp]\n\\centering\n\\includegraphics[width=\\linewidth]{../' + path + '}\n\\caption{' + tex(re.sub(r'^Hình \d+\. ', '', caption)) + '}\n\\end{figure}\n\\FloatBarrier\n')
 
 def code(s):
     wrapped = '\n'.join('\n'.join(textwrap.wrap(line, 94, subsequent_indent='    ', replace_whitespace=False, drop_whitespace=False)) if len(line)>94 else line for line in s.splitlines())
@@ -51,6 +72,8 @@ def code(s):
     run = p.add_run(wrapped)
     run.font.name, run.font.size = 'Consolas', Pt(8)
     p.paragraph_format.line_spacing = 1
+    if body_mode:
+        tex_parts.append('\\begin{Verbatim}[fontsize=\\scriptsize]\n' + wrapped + '\n\\end{Verbatim}\n')
 
 def table(headers, rows):
     parts.append('<table><tr>' + ''.join('<th>'+html.escape(str(x))+'</th>' for x in headers) + '</tr>' + ''.join('<tr>'+''.join('<td>'+html.escape(str(x))+'</td>' for x in row)+'</tr>' for row in rows)+'</table>')
@@ -61,6 +84,27 @@ def table(headers, rows):
     for row in rows:
         for c, value in zip(t.add_row().cells, row):
             c.text = str(value)
+    if body_mode:
+        spec = '|'+ '|'.join(f'p{{{(15.2-0.5*len(headers))/len(headers):.2f}cm}}' for _ in headers)+'|'
+        tex_parts.append('\\begin{center}\n\\small\\renewcommand{\\arraystretch}{1.3}\n\\begin{tabular}{' + spec + '}\\hline\n' + ' & '.join('\\textbf{'+tex(str(x))+'}' for x in headers) + r' \\ \hline' + '\n' + '\n'.join(' & '.join(tex(str(x)) for x in row)+r' \\ \hline' for row in rows) + '\n\\end{tabular}\n\\end{center}\n')
+
+def link(label, url):
+    parts.append(f'<p class="repo"><a href="{html.escape(url)}">{html.escape(label)}</a></p>')
+    p = doc.add_paragraph()
+    hyperlink = OxmlElement('w:hyperlink')
+    hyperlink.set(qn('r:id'), p.part.relate_to(url, RT.HYPERLINK, is_external=True))
+    run = OxmlElement('w:r')
+    props = OxmlElement('w:rPr')
+    color = OxmlElement('w:color')
+    color.set(qn('w:val'), '0000FF')
+    props.append(color)
+    run.append(props)
+    text = OxmlElement('w:t')
+    text.text = label
+    run.append(text)
+    hyperlink.append(run)
+    p._p.append(hyperlink)
+    tex_parts.append('\\noindent\\href{' + url + '}{\\nolinkurl{' + label + '}}\\par\n')
 
 def matrix(path, decimals=0):
     a = np.loadtxt(ROOT / path)
@@ -77,10 +121,19 @@ para('Chia khối 8×8 – Biến đổi DCT – Lượng tử hóa')
 para('Sinh viên thực hiện: Nguyễn Văn Quân')
 para('Mã sinh viên: 23020761')
 para('Học phần: Xử lí ảnh và thị giác')
-para('Người hướng dẫn: PGS. Hoàng Văn Xiêm; ThS. Bùi Đình Đăng')
-para('Hà Nội, 2026')
+para('Người hướng dẫn 1: PGS. Hoàng Văn Xiêm')
+para('Người hướng dẫn 2: ThS. Bùi Đình Đăng')
+para('HÀ NỘI - 2026')
 parts.append('</div>')
 page()
+parts.clear()
+toc_title = doc.add_heading('MỤC LỤC', level=1)
+toc_paragraph = doc.add_paragraph()
+toc_field = OxmlElement('w:fldSimple')
+toc_field.set(qn('w:instr'), 'TOC \\o "1-2" \\h \\z \\u')
+toc_paragraph._p.append(toc_field)
+doc.add_page_break()
+body_mode = True
 heading('1. Mục tiêu và tổ chức thực nghiệm')
 para('Bài thực hành xây dựng ba module chia khối, DCT và lượng tử hóa để mô phỏng nén ảnh xám. Mã Zigzag, RLE, Huffman, giải mã, giải lượng tử, IDCT và ghép khối được dùng từ phần A của đề bài, giữ nguyên thuật toán. Kết quả gồm ảnh dựng lại, sai số MSE, độ dài chuỗi bit Huffman và tỉ lệ hệ số bằng 0.')
 para('Ảnh đầu vào: RaceHorses_416x240_frame001.png, đọc ở chế độ xám uint8. Trong báo cáo, kích thước luôn viết theo H × W: 240 × 416. Khối mẫu là khối số 0 ở góc trên bên trái. Ảnh kiểm tra đệm là vùng image[:13, :19].')
@@ -136,33 +189,32 @@ for prefix, title in [('anh_day_du', '4.4. Kết quả ảnh đầy đủ 240 ×
 heading('4.6. Bước làm mất thông tin và kiểm tra tính đúng', 2)
 para('Lượng tử hóa là bước chủ yếu gây mất thông tin: nhiều giá trị DCT khác nhau cùng được làm tròn về một số nguyên, nên nhân lại Q không thể khôi phục chính xác hệ số ban đầu. DCT/IDCT chỉ có sai số tính toán số thực; thao tác làm tròn và cắt về [0,255] khi xuất ảnh cũng có thể bổ sung sai số. Zigzag, RLE và Huffman bảo toàn chính xác các hệ số nguyên đã lượng tử hóa.')
 para('Kiểm tra bổ sung đối chiếu hệ số trước mã hóa và sau giải mã bằng np.array_equal; kiểm tra thứ tự ghép khối và giá trị đệm; kiểm tra DCT/IDCT trước lượng tử hóa. Với cả ảnh đầy đủ và ảnh cắt, ở cả ba scale, ảnh dựng lại có đúng kích thước và kiểu dữ liệu yêu cầu. Nhật ký kiểm tra được lưu tại bao_cao/kiem_tra.json.')
+page()
 heading('5. Kết luận và cách chạy lại')
 para('Ba module đáp ứng chuỗi xử lí theo đề bài. Trên dữ liệu thực nghiệm, tăng scale làm tăng tỉ lệ hệ số bằng 0 và giảm độ dài chuỗi Huffman, đồng thời làm tăng MSE. Kiểm tra ảnh cắt xác nhận cơ chế đệm biên và cắt bỏ phần đệm khi giải mã hoạt động đúng. Bộ chương trình mô phỏng các bước nén ảnh xám, không tạo tệp JPEG chuẩn.')
 code('python -m pip install -r code/requirements.txt\npython code/cau1_chia_khoi.py --no-show\npython code/cau2_dct.py --no-show\npython code/cau3_luong_tu_hoa.py --no-show')
+heading('6. Mã nguồn và tài liệu sử dụng')
+para('Toàn bộ mã nguồn, ảnh đầu vào, thư viện cần cài đặt và kết quả thực nghiệm được lưu trong kho GitHub dưới đây. Ba module tự viết là cau1_chia_khoi.py, cau2_dct.py và cau3_luong_tu_hoa.py; jpeg_support.py chứa mã hỗ trợ phần A của đề bài. README hướng dẫn cài đặt và chạy từng câu. Có thể tải toàn bộ kho bằng nút Code → Download ZIP hoặc dùng git clone.')
+link(REPO, REPO)
+link(REPO + '/tree/main/code', REPO + '/tree/main/code')
+para('Kho còn chứa verify_results.py để kiểm tra dữ liệu và build_report.py để tạo lại báo cáo. Nguồn LaTeX theo mẫu nằm trong BaoCaoTemplate/main.tex và BaoCaoTemplate/chapter/08_NenAnh.tex.')
 para('Tài liệu sử dụng: Đề bài.pdf, Bài thực hành số 8, gồm yêu cầu Câu 1–3 và mã hỗ trợ phần A. Các bảng, ma trận và hình trong báo cáo được tạo từ ảnh đầu vào có sẵn trong thư mục code.')
-page()
-heading('Phụ lục – Mã Python của ba module tự viết')
-para('Phụ lục chép toàn bộ ba tệp thực thi. jpeg_support.py là mã cho sẵn, được lưu riêng trong thư mục code.')
-for i, filename in enumerate(['cau1_chia_khoi.py', 'cau2_dct.py', 'cau3_luong_tu_hoa.py']):
-    if i:
-        page()
-    heading(filename, 2)
-    code((ROOT / 'code' / filename).read_text(encoding='utf-8'))
 
-doc.save(OUT / f'{NAME}.docx')
 css = '''
 @font-face {font-family: Times; src: url(times.ttf);}
 @font-face {font-family: Times; src: url(timesbd.ttf); font-weight: bold;}
 @font-face {font-family: Mono; src: url(consola.ttf);}
-body {font-family: Times; font-size: 12pt; line-height: 1.3; color: #17212b;}
-h1 {font-size:17pt; color:#163b60; margin-top:16pt; margin-bottom:9pt;}
-h2 {font-size:14pt; color:#163b60; margin-top:12pt; margin-bottom:7pt;}
+body {font-family: Times; font-size: 12pt; line-height: 1.3; color: black;}
+h1 {font-size:16pt; margin-top:16pt; margin-bottom:9pt; page-break-after:avoid;}
+h2 {font-size:13pt; margin-top:12pt; margin-bottom:7pt; page-break-after:avoid;}
 p {margin-top:5pt; margin-bottom:8pt; text-align:justify;}
 table {border-collapse:collapse; width:100%; margin-top:8pt; margin-bottom:12pt; font-size:10pt;}
 td,th {border:0.5pt solid #a4b5c5; padding:5pt;}
-th {background-color:#e7eff7; font-weight:bold;}
+th {font-weight:bold;}
 pre {font-family:Mono; font-size:7.5pt; line-height:1.25; margin:8pt 0;}
-.caption {font-size:10pt; text-align:center; color:#485b6d;}
+.caption {font-size:10pt; text-align:center;}
+.figure {page-break-inside:avoid;}
+.repo {font-size:10pt;}
 .cover {text-align:center; padding-top:45pt;}
 .cover p {text-align:center; margin-bottom:22pt;}
 .cover h1 {font-size:22pt; margin-top:32pt;}
@@ -170,23 +222,84 @@ pre {font-family:Mono; font-size:7.5pt; line-height:1.25; margin:8pt 0;}
 '''
 archive = fitz.Archive(str(ROOT))
 archive.add('C:/Windows/Fonts')
-story = fitz.Story(html=''.join(parts), user_css=css, archive=archive)
-pdf_buffer = io.BytesIO()
-writer = fitz.DocumentWriter(pdf_buffer)
 rect = fitz.Rect(0, 0, 595.276, 841.89)
-content = fitz.Rect(55, 50, 540, 790)
-more = True
-while more:
-    device = writer.begin_page(rect)
-    more, _ = story.place(content)
-    story.draw(device)
-    writer.end_page()
-writer.close()
-pdf = fitz.open(stream=pdf_buffer.getvalue(), filetype='pdf')
+content = fitz.Rect(85.04, 70.87, 538.58, 756.85)
+story = fitz.Story(html=''.join(parts), user_css=css, archive=archive)
+body_pdf = story.write_with_links(lambda *_: (rect, content, None))
+pdf = fitz.open()
+cover = pdf.new_page(width=rect.width, height=rect.height)
+cover.draw_rect(fitz.Rect(87.48, 50.4, rect.width-50.4, rect.height-50.4), width=3)
+fontfiles = {'regular': 'times.ttf', 'bold': 'timesbd.ttf'}
+for key, filename in fontfiles.items():
+    cover.insert_font(fontname=key, fontfile='C:/Windows/Fonts/'+filename)
+def cover_text(text, y, size=12, bold=False):
+    cover.insert_textbox(fitz.Rect(95, y, 537, y+60), text, fontname='bold' if bold else 'regular', fontsize=size, align=1)
+cover_text('ĐẠI HỌC QUỐC GIA HÀ NỘI', 62, 12, True)
+cover_text('TRƯỜNG ĐẠI HỌC CÔNG NGHỆ', 81, 12, True)
+cover.insert_image(fitz.Rect(270, 155, 361, 246), filename=str(ROOT/'BaoCaoTemplate/figures/UET_logo.jpg'), keep_proportion=True)
+cover_text('BÁO CÁO THỰC HÀNH SỐ 8\nMÔ PHỎNG NÉN ẢNH XÁM', 310, 17, True)
+cover_text('Chia khối 8×8 – Biến đổi DCT – Lượng tử hóa', 367, 12)
+for i, line in enumerate(['Sinh viên thực hiện: Nguyễn Văn Quân', 'Mã sinh viên: 23020761', 'Người hướng dẫn 1: PGS. Hoàng Văn Xiêm', 'Người hướng dẫn 2: ThS. Bùi Đình Đăng', 'Lớp: Xử lí ảnh và thị giác']):
+    cover_text(line, 465+i*25, 13, True)
+cover_text('HÀ NỘI - 2026', 745, 12, True)
+toc = pdf.new_page(width=rect.width, height=rect.height)
+toc.insert_font(fontname='regular', fontfile='C:/Windows/Fonts/times.ttf')
+toc.insert_font(fontname='bold', fontfile='C:/Windows/Fonts/timesbd.ttf')
+toc.insert_text((250, 100), 'MỤC LỤC', fontname='bold', fontsize=16)
+pdf.insert_pdf(body_pdf)
+entries = []
+for title in main_headings:
+    for i in range(2, len(pdf)):
+        lines = pdf[i].get_text().replace('\u00a0', ' ').splitlines()
+        if title in lines:
+            entries.append((title, i))
+            break
+for j, (title, page_index) in enumerate(entries):
+    y = 145+j*34
+    toc = pdf[1]
+    toc.insert_text((85, y), title, fontname='regular', fontsize=12)
+    toc.insert_text((520, y), str(page_index-1), fontname='regular', fontsize=12)
+    toc.insert_link({'kind': fitz.LINK_GOTO, 'from': fitz.Rect(85,y-14,535,y+5), 'page':page_index})
+    cached = OxmlElement('w:r')
+    cached_text = OxmlElement('w:t')
+    cached_text.text = title
+    cached.append(cached_text)
+    toc_field.append(cached)
+    linebreak = OxmlElement('w:r')
+    linebreak.append(OxmlElement('w:br'))
+    toc_field.append(linebreak)
+pdf.set_toc([[1, title, i+1] for title, i in entries])
 pdf.set_metadata({'title': 'Báo cáo thực hành số 8 – Mô phỏng nén ảnh xám', 'author': 'Nguyễn Văn Quân – 23020761'})
 for index, p in enumerate(pdf):
     if index:
-        p.insert_text((285, 818), str(index), fontsize=9, color=(.35,.35,.35))
+        p.insert_text((305, 795), 'i' if index == 1 else str(index-1), fontsize=10)
 pdf.save(OUT / f'{NAME}.pdf', deflate=True)
+for style in ['Title', 'Heading 1', 'Heading 2']:
+    doc.styles[style].font.name = 'Times New Roman'
+    doc.styles[style].font.color.rgb = RGBColor(0, 0, 0)
+# Khung bìa chỉ áp dụng trang đầu, đúng bố cục Bia.tex.
+borders = OxmlElement('w:pgBorders')
+borders.set(qn('w:offsetFrom'), 'page')
+borders.set(qn('w:display'), 'firstPage')
+for side in ['top', 'left', 'bottom', 'right']:
+    border = OxmlElement('w:'+side)
+    for key, value in {'val':'single', 'sz':'24', 'space':'24', 'color':'000000'}.items():
+        border.set(qn('w:'+key), value)
+    borders.append(border)
+section._sectPr.append(borders)
+for p in doc.paragraphs:
+    if p == toc_title:
+        break
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if p.text == 'HÀ NỘI - 2026':
+        break
+section.different_first_page_header_footer = True
+footer = section.footer.paragraphs[0]
+footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+number = OxmlElement('w:fldSimple')
+number.set(qn('w:instr'), 'PAGE')
+footer._p.append(number)
+doc.save(OUT / f'{NAME}.docx')
+(ROOT/'BaoCaoTemplate/chapter/08_NenAnh.tex').write_text(''.join(tex_parts).rstrip() + '\n', encoding='utf-8')
 print(f'Created {NAME}.pdf ({len(pdf)} pages) and DOCX')
 pdf.close()
