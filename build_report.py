@@ -2,11 +2,9 @@
 from pathlib import Path
 import csv
 import html
-import platform
 import re
 import textwrap
 
-import cv2
 import numpy as np
 import pymupdf as fitz
 from docx import Document
@@ -91,6 +89,12 @@ def table(headers, rows):
 def link(label, url):
     parts.append(f'<p class="repo"><a href="{html.escape(url)}">{html.escape(label)}</a></p>')
     p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_before = Pt(12)
+    p.paragraph_format.space_after = Pt(12)
+    shading = OxmlElement('w:shd')
+    shading.set(qn('w:fill'), 'F5F7FA')
+    p._p.get_or_add_pPr().append(shading)
     hyperlink = OxmlElement('w:hyperlink')
     hyperlink.set(qn('r:id'), p.part.relate_to(url, RT.HYPERLINK, is_external=True))
     run = OxmlElement('w:r')
@@ -134,71 +138,73 @@ toc_field.set(qn('w:instr'), 'TOC \\o "1-2" \\h \\z \\u')
 toc_paragraph._p.append(toc_field)
 doc.add_page_break()
 body_mode = True
-heading('1. Mục tiêu và tổ chức thực nghiệm')
-para('Bài thực hành xây dựng ba module chia khối, DCT và lượng tử hóa để mô phỏng nén ảnh xám. Mã Zigzag, RLE, Huffman, giải mã, giải lượng tử, IDCT và ghép khối được dùng từ phần A của đề bài, giữ nguyên thuật toán. Kết quả gồm ảnh dựng lại, sai số MSE, độ dài chuỗi bit Huffman và tỉ lệ hệ số bằng 0.')
-para('Ảnh đầu vào: RaceHorses_416x240_frame001.png, đọc ở chế độ xám uint8. Trong báo cáo, kích thước luôn viết theo H × W: 240 × 416. Khối mẫu là khối số 0 ở góc trên bên trái. Ảnh kiểm tra đệm là vùng image[:13, :19].')
-table(['Thành phần', 'Nội dung'], [
-    ['cau1_chia_khoi.py', 'split_blocks; đọc ảnh, lưới khối, thử đệm'],
-    ['cau2_dct.py', 'dct_blocks; dịch mức và biểu diễn DCT'],
-    ['cau3_luong_tu_hoa.py', 'quantize; chạy 3 mức, lưu ảnh và CSV'],
-    ['jpeg_support.py', 'Mã hỗ trợ cho sẵn trong đề bài'],
-])
-para(f'Môi trường thực nghiệm: Python {platform.python_version()}, NumPy {np.__version__}, OpenCV {cv2.__version__}. Chạy cả ba chương trình với tùy chọn --no-show; số liệu được đọc trực tiếp từ CSV kết quả.')
-heading('2. Câu 1 – Chia ảnh thành khối 8×8')
-para('Với ảnh H × W, số hàng cần đệm là (-H) mod 8 và số cột cần đệm là (-W) mod 8. Dùng np.pad với mode="edge" để sao chép điểm ảnh biên xuống phía dưới và sang phải. Sắp xếp reshape → transpose → reshape tạo các khối theo thứ tự từ trái sang phải, từ trên xuống dưới.')
+heading('1. Câu 1 – Chia ảnh thành khối 8×8')
+heading('1.1. Cách thực hiện', 2)
+para('Đọc ảnh RaceHorses_416x240_frame001.png ở chế độ ảnh xám. Ảnh có chiều cao 240 và chiều rộng 416 điểm ảnh, kiểu uint8. Trong báo cáo, kích thước được viết theo thứ tự chiều cao × chiều rộng.')
+para('Hàm split_blocks(image) chia ảnh thành các khối 8×8, lấy từ trái sang phải rồi từ trên xuống dưới. Hàm trả về blocks là mảng (N, 8, 8), original_shape là kích thước ảnh ban đầu và padded_shape là kích thước sau đệm. N là số khối.')
+para('Nếu kích thước chưa chia hết cho 8, chương trình thêm hàng ở dưới và cột ở bên phải bằng cách lặp lại giá trị điểm ảnh biên. Số hàng thêm là (-H) mod 8, số cột thêm là (-W) mod 8. Việc đệm dùng np.pad với mode="edge".')
+heading('1.2. Kết quả', 2)
 table(['Ảnh', 'Trước đệm H × W', 'Sau đệm H × W', 'Số khối', 'blocks.shape'], [
     ['Đầy đủ', '240 × 416', '240 × 416', '1.560', '(1560, 8, 8)'],
     ['Cắt', '13 × 19', '16 × 24', '6', '(6, 8, 8)'],
 ])
-para('Ảnh đầy đủ chia hết cho 8 nên không cần đệm. Ảnh cắt thêm 3 hàng và 5 cột; vùng đệm không được tính vào MSE sau khi ảnh giải mã được cắt về 13 × 19.')
+para('Ảnh đầy đủ không cần đệm vì cả hai chiều đều chia hết cho 8. Để thử trường hợp cần đệm, lấy vùng 13×19 ở góc trên bên trái bằng image[:13, :19]. Ảnh cắt được thêm 3 hàng và 5 cột, thành 16×24 và chia được 6 khối.')
 image('code/ket_qua/cau1/chia_khoi.png', 'Hình 1. Ảnh gốc, lưới khối 8×8 và ảnh cắt sau đệm.')
-heading('2.1. Ma trận khối mẫu', 2)
+para('Chọn khối số 0 ở góc trên bên trái làm khối mẫu. Ma trận điểm ảnh của khối này là:')
 matrix('code/ket_qua/cau1/khoi_mau.txt')
 page()
-heading('3. Câu 2 – Biến đổi DCT')
-para('Mỗi khối được chuyển từ uint8 sang float32 trước khi trừ 128 để tránh tràn số. Sau đó cv2.dct tính DCT hai chiều trực chuẩn. Kết quả có kích thước (N, 8, 8), kiểu float32. Dịch mức đưa miền [0, 255] về [-128, 127].')
-para('Hệ số DC nằm ở (0, 0): F[0,0] = 8 × (trung bình khối − 128). Khối mẫu có trung bình 153,171875 nên DC = 201,375. Các hệ số AC còn lại mô tả biến thiên theo tần số dọc u và ngang v; chỉ số càng lớn tương ứng dao động càng nhanh.')
-heading('3.1. Ma trận DCT của khối mẫu', 2)
+heading('2. Câu 2 – Biến đổi DCT')
+heading('2.1. Cách thực hiện', 2)
+para('Hàm dct_blocks(blocks) chuyển từng khối sang float32, trừ 128 rồi gọi cv2.dct. Cần đổi kiểu dữ liệu trước khi trừ để các giá trị âm được tính đúng. Kết quả là mảng hệ số DCT có cùng kích thước (N, 8, 8), kiểu float32.')
+heading('2.2. Kết quả của khối mẫu', 2)
+para('Dùng lại khối số 0 ở Câu 1. Ma trận DCT nhận được là:')
 matrix('code/ket_qua/cau2/dct_khoi_mau.txt', 2)
-image('code/ket_qua/cau2/dct.png', 'Hình 2. Khối mẫu và độ lớn log(1 + |DCT|), kèm thang màu.')
-para('DC = 201,375 có độ lớn vượt trội. Một số AC đáng kể gồm F[1,1] ≈ −22,75 và F[3,0] ≈ −22,10, nằm gần vùng tần số thấp. Nhiều hệ số phía dưới bên phải có độ lớn nhỏ, chẳng hạn F[6,6] ≈ 0,14 và F[7,7] ≈ −0,88. Biểu diễn log giúp nhìn thấy cả các AC nhỏ. Sự tập trung năng lượng phụ thuộc nội dung từng khối; khối có biên hoặc kết cấu mạnh vẫn có thể có AC tần số cao đáng kể.')
-heading('4. Câu 3 – Lượng tử hóa và dựng lại ảnh')
-para('Tạo Q0[u,v] = 8 + 4 × (u + v), với u,v = 0,…,7. Với scale s > 0, tính Q = max(1, round(Q0 × s)) theo từng phần tử, lưu float32. Các hệ số được lượng tử hóa theo quantized = round(coefficients / Q), lưu int32. np.rint làm tròn về số chẵn gần nhất khi đúng nửa đơn vị.')
-para('Q tăng theo tần số, nên cùng độ lớn hệ số, các thành phần tần số cao dễ trở thành 0 hơn. Ở scale 1,0, bảng Q tăng từ 8 tại DC đến 64 tại góc dưới bên phải.')
-heading('4.1. Bảng Q tại scale = 1,0', 2)
+para('Hệ số DC ở vị trí (0, 0) bằng 201,375. Hệ số này thể hiện độ sáng trung bình của khối sau khi trừ 128. Với khối 8×8, DC = 8 × (trung bình khối − 128). Trung bình của khối mẫu là 153,171875.')
+para('63 hệ số còn lại là AC, thể hiện sự thay đổi độ sáng trong khối theo chiều ngang và chiều dọc. Các vị trí gần góc trên bên trái là tần số thấp, thường mô tả vùng sáng thay đổi chậm. Các vị trí xa góc này là tần số cao, thường mô tả chi tiết nhỏ và đường biên.')
+image('code/ket_qua/cau2/dct.png', 'Hình 2. Khối mẫu và ảnh màu log(1 + |DCT|), kèm thang màu.')
+para('Trong khối mẫu, DC có độ lớn lớn nhất. Một số AC gần góc trên bên trái cũng khá lớn, như F[1,1] ≈ −22,75 và F[3,0] ≈ −22,10. Nhiều hệ số ở góc dưới bên phải nhỏ hơn, như F[6,6] ≈ 0,14 và F[7,7] ≈ −0,88. Như vậy, các hệ số lớn chủ yếu nằm ở vùng tần số thấp. Cách vẽ log giúp nhìn rõ cả những hệ số nhỏ.')
+page()
+heading('3. Câu 3 – Lượng tử hóa và dựng lại ảnh')
+heading('3.1. Cách lượng tử hóa', 2)
+para('Hàm quantize(coefficients, quant_scale) nhận các hệ số DCT và mức lượng tử quant_scale > 0. Bảng Q được tính theo từng phần tử như sau:')
+code('Q0[u, v] = 8 + 4 × (u + v), với u, v từ 0 đến 7\nQ = max(1, round(Q0 × quant_scale))\nquantized = round(coefficients / Q)')
+para('Hàm trả về quantized là mảng số nguyên int32 kích thước (N, 8, 8), và Q là bảng float32 kích thước 8×8. Có thể hiểu lượng tử hóa là chia mỗi hệ số DCT cho giá trị tương ứng trong Q rồi làm tròn. Q càng lớn thì các hệ số nhỏ càng dễ trở thành 0.')
+heading('3.2. Kết quả tại quant_scale = 1,0', 2)
+para('Bảng Q tại mức 1,0:')
 matrix('code/ket_qua/cau3/anh_day_du_Q.txt')
-heading('4.2. Khối mẫu sau lượng tử hóa tại scale = 1,0', 2)
+para('Khối mẫu sau lượng tử hóa:')
 matrix('code/ket_qua/cau3/anh_day_du_khoi_luong_tu.txt')
-para('DC được làm tròn từ 201,375 / 8 thành 25, giải lượng tử cho 200. Khối mẫu còn 7 hệ số khác 0 trên tổng 64 hệ số, tức 89,0625% bằng 0. Đây là tỉ lệ riêng khối mẫu; tỉ lệ toàn ảnh tại scale 1,0 là khoảng 81,1%.')
-heading('4.3. Quy trình mã hóa và chỉ tiêu đánh giá', 2)
-para('Quy trình: ảnh xám → chia khối/đệm → trừ 128 → DCT → lượng tử hóa → Zigzag → RLE → Huffman. Giải mã thực hiện các phép ngược, nhân Q, IDCT, cộng 128, ghép khối, cắt bỏ phần đệm, làm tròn và giới hạn về uint8.')
-para('MSE = tổng (I[y,x] − Î[y,x])² / (H × W), tính trên ảnh sau khi cắt phần đệm. Tỉ lệ hệ số 0 = số phần tử quantized bằng 0 / (N × 64). Số bit dữ liệu = len(bits), chỉ tính chuỗi Huffman; chưa tính bảng mã, Q và metadata. Các ảnh PNG lưu ra chỉ để quan sát ảnh dựng lại, không biểu diễn dung lượng tệp nén của bộ mô phỏng.')
-for prefix, title in [('anh_day_du', '4.4. Kết quả ảnh đầy đủ 240 × 416'), ('anh_cat_13x19', '4.5. Kết quả ảnh cắt 13 × 19')]:
+para('Ví dụ, DC được tính bằng round(201,375 / 8) = 25. Với toàn ảnh, tỉ lệ hệ số bằng 0 tại mức 1,0 là 81,146%. Tỉ lệ này được tính bằng số hệ số bằng 0 chia cho tổng số hệ số, rồi nhân 100%.')
+heading('3.3. Mã hóa, dựng lại ảnh và cách đo', 2)
+para('Dùng nguyên mã hỗ trợ trong jpeg_support.py của đề bài để mã hóa bằng Zigzag, RLE và Huffman. Khi dựng lại ảnh, chương trình giải mã, nhân lại Q, dùng IDCT, cộng 128 rồi ghép các khối. Cuối cùng, bỏ phần đệm và đưa điểm ảnh về kiểu uint8, trong khoảng 0–255.')
+para('MSE là trung bình bình phương chênh lệch giữa điểm ảnh gốc và điểm ảnh dựng lại. MSE càng nhỏ thì ảnh dựng lại càng gần ảnh gốc. MSE chỉ được tính trên vùng ảnh ban đầu, sau khi bỏ phần đệm.')
+para('Số bit dữ liệu là độ dài chuỗi Huffman, chưa gồm bảng mã, Q và thông tin đi kèm. Đây không phải dung lượng file JPEG chuẩn. Các ảnh PNG chỉ dùng để quan sát kết quả.')
+for prefix, title in [('anh_day_du', '3.4. Kết quả ảnh đầy đủ 240 × 416'), ('anh_cat_13x19', '3.5. Kết quả ảnh cắt 13 × 19')]:
     page()
     heading(title, 2)
     with (ROOT / f'code/ket_qua/cau3/{prefix}_ket_qua.csv').open(encoding='utf-8-sig') as stream:
         rows = list(csv.DictReader(stream))
     table(['Scale', 'MSE', 'Số bit dữ liệu', 'Hệ số bằng 0 (%)'], [[r['quant_scale'], f"{float(r['MSE']):.4f}", f"{int(r['so_bit_du_lieu']):,}", f"{100*float(r['ti_le_he_so_0']):.3f}"] for r in rows])
-    image(f'code/ket_qua/cau3/{prefix}_so_sanh.png', 'Ảnh gốc và ảnh dựng lại tại scale 0,5; 1,0; 3,0 (cùng thang xám 0–255).')
+    number = 3 if prefix == 'anh_day_du' else 4
+    image(f'code/ket_qua/cau3/{prefix}_so_sanh.png', f'Hình {number}. Từ trái sang phải: ảnh gốc và ảnh dựng lại ở mức 0,5; 1,0; 3,0.')
     if prefix == 'anh_day_du':
-        para('Tại scale 0,5, ảnh giữ lại nhiều chi tiết hơn, MSE 12,34 và 70,8% hệ số bằng 0. Tại scale 1,0, MSE tăng lên 30,47 và khoảng 81,1% hệ số bằng 0. Tại scale 3,0, MSE đạt 97,46 và khoảng 91,9% hệ số bằng 0; các chi tiết nhỏ và kết cấu bị làm mượt mạnh hơn.')
-        para('Từ scale 0,5 đến 3,0, số bit giảm từ 166.471 xuống 47.347 (giảm khoảng 71,6%), trong khi MSE tăng khoảng 7,9 lần. Scale 1,0 là mức trung gian trong ba cấu hình thử nghiệm; lựa chọn thực tế tùy yêu cầu chất lượng và dung lượng.')
+        para('Ở mức 0,5, ảnh giữ được nhiều chi tiết nhất trong ba mức thử, MSE là 12,34 và số bit là 166.471. Ở mức 1,0, một số chi tiết nhỏ giảm đi, MSE tăng lên 30,47 và số bit còn 108.113. Ở mức 3,0, ảnh mờ hơn, mất nhiều chi tiết hơn; MSE tăng lên 97,46 và số bit còn 47.347.')
+        para('Khi tăng mức lượng tử, số hệ số bằng 0 tăng từ khoảng 70,8% lên 91,9%. Nhiều số 0 giúp bước mã hóa cần ít bit hơn. Kết quả cho thấy phải đánh đổi giữa chất lượng ảnh và số bit dữ liệu.')
     else:
-        para('Ảnh cắt có 6 khối sau đệm thành 16 × 24. Ở cả ba mức, ảnh dựng lại đều có kích thước 13 × 19 và kiểu uint8. MSE được đo trên 247 điểm ảnh gốc, còn số bit và tỉ lệ hệ số 0 bao gồm 384 hệ số của các khối sau đệm. Vì vậy không so sánh trực tiếp số bit tuyệt đối của ảnh cắt với ảnh đầy đủ để kết luận hiệu quả nén.')
-        para('MSE tăng từ 16,04 lên 77,62 khi tăng scale; số bit giảm từ 480 xuống 63. Tại scale 3,0, 96,4% hệ số bằng 0. Ảnh cắt chứa ít nội dung và nhiều điểm ảnh đệm lặp lại nên có phân bố hệ số khác ảnh đầy đủ.')
-heading('4.6. Bước làm mất thông tin và kiểm tra tính đúng', 2)
-para('Lượng tử hóa là bước chủ yếu gây mất thông tin: nhiều giá trị DCT khác nhau cùng được làm tròn về một số nguyên, nên nhân lại Q không thể khôi phục chính xác hệ số ban đầu. DCT/IDCT chỉ có sai số tính toán số thực; thao tác làm tròn và cắt về [0,255] khi xuất ảnh cũng có thể bổ sung sai số. Zigzag, RLE và Huffman bảo toàn chính xác các hệ số nguyên đã lượng tử hóa.')
-para('Kiểm tra bổ sung đối chiếu hệ số trước mã hóa và sau giải mã bằng np.array_equal; kiểm tra thứ tự ghép khối và giá trị đệm; kiểm tra DCT/IDCT trước lượng tử hóa. Với cả ảnh đầy đủ và ảnh cắt, ở cả ba scale, ảnh dựng lại có đúng kích thước và kiểu dữ liệu yêu cầu. Nhật ký kiểm tra được lưu tại bao_cao/kiem_tra.json.')
+        para('Ảnh cắt cũng cho kết quả tương tự: khi tăng mức lượng tử từ 0,5 lên 3,0, MSE tăng từ 16,04 lên 77,62, còn số bit giảm từ 480 xuống 63. Tỉ lệ hệ số bằng 0 tăng từ khoảng 74,0% lên 96,4%.')
+        para('Ảnh cắt được đệm thành 16×24 để xử lí. Khi dựng lại, chương trình bỏ phần đệm để trả về đúng 13×19. MSE được tính trên 247 điểm ảnh ban đầu; số bit và tỉ lệ hệ số bằng 0 tính trên toàn bộ 6 khối sau đệm.')
 page()
-heading('5. Kết luận và cách chạy lại')
-para('Ba module đáp ứng chuỗi xử lí theo đề bài. Trên dữ liệu thực nghiệm, tăng scale làm tăng tỉ lệ hệ số bằng 0 và giảm độ dài chuỗi Huffman, đồng thời làm tăng MSE. Kiểm tra ảnh cắt xác nhận cơ chế đệm biên và cắt bỏ phần đệm khi giải mã hoạt động đúng. Bộ chương trình mô phỏng các bước nén ảnh xám, không tạo tệp JPEG chuẩn.')
-code('python -m pip install -r code/requirements.txt\npython code/cau1_chia_khoi.py --no-show\npython code/cau2_dct.py --no-show\npython code/cau3_luong_tu_hoa.py --no-show')
-heading('6. Mã nguồn và tài liệu sử dụng')
-para('Toàn bộ mã nguồn, ảnh đầu vào, thư viện cần cài đặt và kết quả thực nghiệm được lưu trong kho GitHub dưới đây. Ba module tự viết là cau1_chia_khoi.py, cau2_dct.py và cau3_luong_tu_hoa.py; jpeg_support.py chứa mã hỗ trợ phần A của đề bài. README hướng dẫn cài đặt và chạy từng câu. Có thể tải toàn bộ kho bằng nút Code → Download ZIP hoặc dùng git clone.')
+heading('3.6. Bước làm mất thông tin', 2)
+para('Lượng tử hóa là bước chính làm mất thông tin. Khi chia rồi làm tròn, nhiều giá trị khác nhau trở thành cùng một số nguyên. Vì vậy, nhân lại với Q không lấy lại được chính xác giá trị ban đầu. Ví dụ, DC của khối mẫu là 201,375; sau lượng tử hóa được 25, nhân lại Q chỉ được 200.')
+para('Zigzag, RLE và Huffman không làm mất các hệ số nguyên đã lượng tử hóa. DCT và IDCT có sai số tính toán nhỏ. Việc làm tròn và giới hạn điểm ảnh về 0–255 khi xuất ảnh cũng có thể tạo thêm sai số.')
+heading('3.7. Kiểm tra kích thước ảnh dựng lại', 2)
+table(['Ảnh', 'Kích thước gốc', 'Dựng lại ở cả 3 mức', 'Kiểu dữ liệu'], [
+    ['Đầy đủ', '240 × 416', '240 × 416', 'uint8'],
+    ['Cắt có đệm', '13 × 19', '13 × 19', 'uint8'],
+])
+para('Cả 6 trường hợp đều trả về đúng kích thước và kiểu dữ liệu của ảnh đầu vào. Kiểm tra thêm cho thấy các hệ số nguyên trước mã hóa và sau giải mã giống nhau hoàn toàn.')
+heading('4. Mã nguồn')
 link(REPO, REPO)
-link(REPO + '/tree/main/code', REPO + '/tree/main/code')
-para('Kho còn chứa verify_results.py để kiểm tra dữ liệu và build_report.py để tạo lại báo cáo. Nguồn LaTeX theo mẫu nằm trong BaoCaoTemplate/main.tex và BaoCaoTemplate/chapter/08_NenAnh.tex.')
-para('Tài liệu sử dụng: Đề bài.pdf, Bài thực hành số 8, gồm yêu cầu Câu 1–3 và mã hỗ trợ phần A. Các bảng, ma trận và hình trong báo cáo được tạo từ ảnh đầu vào có sẵn trong thư mục code.')
 
 css = '''
 @font-face {font-family: Times; src: url(times.ttf);}
@@ -214,7 +220,7 @@ th {font-weight:bold;}
 pre {font-family:Mono; font-size:7.5pt; line-height:1.25; margin:8pt 0;}
 .caption {font-size:10pt; text-align:center;}
 .figure {page-break-inside:avoid;}
-.repo {font-size:10pt;}
+.repo {font-size:11pt; text-align:center; padding:12pt; border:0.5pt solid #a4b5c5; background-color:#f5f7fa;}
 .cover {text-align:center; padding-top:45pt;}
 .cover p {text-align:center; margin-bottom:22pt;}
 .cover h1 {font-size:22pt; margin-top:32pt;}
